@@ -3,6 +3,7 @@ from pygame.locals import *
 import random
 import time
 
+# Kích thước cửa sổ
 WINDOWWIDTH = 800
 WINDOWHEIGHT = 500
 pygame.init()
@@ -41,23 +42,29 @@ WHITE = (255, 255, 255)
 BLACK = (0, 0, 0)
 RED = (255, 0, 0)
 
-# Biến lưu điểm số
+# Biến lưu điểm số và cấp độ
 diem = 0
+level = 1  # Mặc định là Easy
+target_score = 100  # Điểm cần đạt để qua cấp độ
+max_time_for_promotion = 30  # Thời gian tối đa để tự động tăng cấp
+max_level = 10  # Cấp độ cao nhất
 
 # Hàm tạo nút
 def draw_button(text, font, color, rect, surface):
     pygame.draw.rect(surface, color, rect)
     text_surface = font.render(text, True, WHITE)
     surface.blit(text_surface, (
-    rect[0] + (rect[2] - text_surface.get_width()) // 2, rect[1] + (rect[3] - text_surface.get_height()) // 2))
+        rect[0] + (rect[2] - text_surface.get_width()) // 2, rect[1] + (rect[3] - text_surface.get_height()) // 2))
 
 # Hàm hiển thị giao diện chính
 def main_menu():
-    pygame.mouse.set_visible(True)  # Hiển thị lại con trỏ chuột trong menu
-    while True:  # Vòng lặp hiển thị menu
+    global level
+    menu = True
+    font = pygame.font.SysFont('Arial', 50)
+    button_rect = pygame.Rect(WINDOWWIDTH // 2 - 100, WINDOWHEIGHT // 2 - 50, 200, 100)
+
+    while menu:
         w.blit(menu_BG, (0, 0))
-        font = pygame.font.SysFont('Arial', 50)
-        button_rect = pygame.Rect(WINDOWWIDTH // 2 - 100, WINDOWHEIGHT // 2 - 50, 200, 100)
         draw_button('START', font, RED, button_rect, w)
 
         for event in pygame.event.get():
@@ -66,8 +73,7 @@ def main_menu():
                 sys.exit()
             if event.type == pygame.MOUSEBUTTONDOWN:
                 if button_rect.collidepoint(event.pos):
-                    pygame.mouse.set_visible(False)  # Ẩn chuột khi bắt đầu game
-                    return  # Thoát khỏi menu để bắt đầu game
+                    menu = False  # Thoát khỏi menu
 
         pygame.display.update()
         fpsClock.tick(FPS)
@@ -76,30 +82,34 @@ def main_menu():
 def init_fruit(fruit_image):
     x_pos = random.randint(50, WINDOWWIDTH - 50)
     y_pos = random.randint(-100, -50)
-    speed = random.randint(5, 20)
+    # Tốc độ tăng theo cấp độ
+    speed = random.randint(5 + level * 2, 10 + level * 5)
     return {"image": fruit_image, "x": x_pos, "y": y_pos, "speed": speed}
 
 # Khởi tạo danh sách các quả
-fruits = [init_fruit(tao), init_fruit(cam), init_fruit(xoai), init_fruit(dua), init_fruit(chuoi)]
+def reset_fruits():
+    return [init_fruit(tao), init_fruit(cam), init_fruit(xoai), init_fruit(dua), init_fruit(chuoi)]
 
 # Hàm hiển thị GAME OVER
-def game_over():
-    font = pygame.font.SysFont('Arial', 80)
-    text = font.render('GAME OVER', True, RED)
+def show_message(message):
+    font = pygame.font.SysFont('Arial', 50)
+    text = font.render(message, True, RED)
     w.blit(text, (WINDOWWIDTH // 2 - text.get_width() // 2, WINDOWHEIGHT // 2 - text.get_height() // 2))
     pygame.display.update()
-    pygame.time.wait(2000)  # Dừng lại 2 giây trước khi quay lại menu chính
-    main_menu()  # Quay lại menu chính
+    pygame.time.wait(5000)  # Dừng lại 3 giây trước khi quay lại menu chính
 
 # Hàm chính để chạy trò chơi
 def game():
-    global diem, meo2
+    global diem, meo2, level, target_score
     diem = 0  # Đặt lại điểm số
     meo2 = meo  # Đặt lại hình ảnh mặc định cho con mèo
     time0 = time.time()
 
     # Ẩn con trỏ chuột mặc định
     pygame.mouse.set_visible(False)
+
+    # Khởi tạo lại danh sách quả
+    fruits = reset_fruits()
 
     while True:
         for event in pygame.event.get():
@@ -109,17 +119,8 @@ def game():
             if event.type == pygame.MOUSEBUTTONDOWN:
                 meo2 = meo1
                 for fruit in fruits:
-                    if event.pos[0] > fruit["x"] - 20 and event.pos[0] < fruit["x"] + 60 and event.pos[1] > fruit["y"] - 50 and event.pos[1] < fruit["y"] + 50:
-                        if fruit["image"] == tao:
-                            diem += 5
-                        elif fruit["image"] == cam:
-                            diem += 3
-                        elif fruit["image"] == xoai:
-                            diem += 2
-                        elif fruit["image"] == dua:
-                            diem += 6
-                        elif fruit["image"] == chuoi:
-                            diem += 1
+                    if fruit["x"] - 20 < event.pos[0] < fruit["x"] + 60 and fruit["y"] - 50 < event.pos[1] < fruit["y"] + 50:
+                        diem += random.randint(5, 10)
                         fruit["y"] = random.randint(-100, -50)
                         fruit["x"] = random.randint(50, WINDOWWIDTH - 50)
             if event.type == pygame.MOUSEBUTTONUP:
@@ -135,30 +136,40 @@ def game():
                 fruit["y"] = random.randint(-100, -50)
                 fruit["x"] = random.randint(50, WINDOWWIDTH - 50)
 
-        # Lấy vị trí của chuột và vẽ hình ảnh con mèo tại đó
+        # Hiển thị hình ảnh con mèo tại vị trí chuột
         mouse_pos = pygame.mouse.get_pos()
         w.blit(meo2, (mouse_pos[0] - 25, mouse_pos[1] - 25))
 
+        # Hiển thị thông tin level, điểm số và thời gian
         time1 = time.time()
         elapsed_time = int(time1 - time0)
         font = pygame.font.SysFont('Arial', 30)
-        text = font.render('Score: {}'.format(diem), True, RED)
-        text1 = font.render('Time: {}'.format(elapsed_time), True, RED)
-        w.blit(text, (50, 50))
-        w.blit(text1, (50, 80))
+        w.blit(font.render(f'Score: {diem}', True, RED), (50, 50))
+        w.blit(font.render(f'Time: {elapsed_time}', True, RED), (50, 80))
+        w.blit(font.render(f'Level: {level}', True, RED), (50, 110))
 
-        # Kiểm tra điều kiện thua hoặc qua màn
-        if elapsed_time >= 60:  # Nếu hết thời gian 1 phút
-            if diem >= 200:
-                return  # Qua màn (có thể thêm logic để bắt đầu màn mới)
-            else:
-                game_over()  # Kết thúc game và trở về menu chính
-                return
+        # Tăng cấp nếu đạt điểm yêu cầu hoặc vượt qua giới hạn thời gian
+        if diem >= target_score or (elapsed_time <= max_time_for_promotion and diem >= target_score):
+            if level == max_level:
+                pygame.mouse.set_visible(True)  # Hiện lại con trỏ chuột
+                show_message("YOU WIN!")  # Hiển thị thông báo thắng
+                return  # Quay lại menu chính
+            level += 1
+            target_score += 100  # Mục tiêu tăng thêm mỗi cấp
+            fruits = reset_fruits()  # Làm mới danh sách quả
+
+            pygame.time.wait(1000)  # Tạm dừng 1 giây để người chơi nhận biết
+
+        # Kiểm tra điều kiện thua
+        if elapsed_time >= 120 and diem < target_score:
+            pygame.mouse.set_visible(True)  # Hiện lại con trỏ chuột trước khi thoát
+            show_message("GAME OVER")
+            return  # Trở về menu chính
 
         pygame.display.update()
         fpsClock.tick(FPS)
 
 # Chạy chương trình
-main_menu()  # Hiển thị menu chính trước
 while True:
+    main_menu()  # Hiển thị menu chính trước
     game()  # Sau khi nhấn nút START, trò chơi bắt đầu
